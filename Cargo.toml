@@ -60,6 +60,7 @@ required-features = ["set-version"]
 concolor-control = { version = "0.0.7", default-features = false }
 cargo_metadata = "0.14.0"
 crates-index = "0.18.6"
+cargo-util = "0.1.2"
 dunce = "1.0"
 dirs-next = "2.0.0"
 env_proxy = "0.4.1"

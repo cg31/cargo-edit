@@ -4,6 +4,7 @@ use std::io::Write;
 use std::path::Path;
 use std::time::Duration;
 
+use cargo_util::ProcessBuilder;
 use termcolor::{Color, ColorSpec, StandardStream, WriteColor};
 use url::Url;
 
@@ -249,7 +250,7 @@ fn registry_features(v: &crates_index::Version) -> BTreeMap<String, Vec<String>>
 }
 
 /// update registry index for given project
-pub fn update_registry_index(registry: &Url, quiet: bool) -> CargoResult<()> {
+pub fn _update_registry_index(registry: &Url, quiet: bool) -> CargoResult<()> {
     let colorchoice = super::colorize_stderr();
     let mut output = StandardStream::stderr(colorchoice);
 
@@ -265,6 +266,39 @@ pub fn update_registry_index(registry: &Url, quiet: bool) -> CargoResult<()> {
         registry_blocked_message(&mut output)?;
         std::thread::sleep(REGISTRY_BACKOFF);
     }
+
+    Ok(())
+}
+
+/// update registry index for given project, using git-cli
+pub fn update_registry_index(registry: &Url, quiet: bool) -> CargoResult<()> {
+    let colorchoice = super::colorize_stderr();
+    let mut output = StandardStream::stderr(colorchoice);
+
+    if !quiet {
+        output.set_color(ColorSpec::new().set_fg(Some(Color::Green)).set_bold(true))?;
+        write!(output, "{:>12}", "Updating")?;
+        output.reset()?;
+        writeln!(output, " '{}' index", registry)?;
+    }
+
+    let mut cmd = ProcessBuilder::new("git");
+    cmd.arg("fetch");
+    cmd.arg("--force") // handle force pushes
+        .arg("--update-head-ok") // see discussion in #2078
+        .arg(registry.as_str())
+        // If cargo is run by git (for example, the `exec` command in `git
+        // rebase`), the GIT_DIR is set by git and will point to the wrong
+        // location (this takes precedence over the cwd). Make sure this is
+        // unset so git will look at cwd for the repo.
+        .env_remove("GIT_DIR")
+        // The reset of these may not be necessary, but I'm including them
+        // just to be extra paranoid and avoid any issues.
+        .env_remove("GIT_WORK_TREE")
+        .env_remove("GIT_INDEX_FILE")
+        .env_remove("GIT_OBJECT_DIRECTORY")
+        .env_remove("GIT_ALTERNATE_OBJECT_DIRECTORIES");
+    cmd.exec_with_output()?;
 
     Ok(())
 }
